@@ -1,8 +1,7 @@
-import { useState } from 'react';
-import { Sparkles, PenTool, Search, Filter, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Sparkles, PenTool, Search, Filter, Loader2, RefreshCw } from 'lucide-react';
 import { Question, PolishResult } from '../types';
-import { mockQuestions } from '../data/mockData';
-import { polishEssay } from '../services/aiService';
+import { polishEssay, searchQuestions } from '../services/aiService';
 import QuestionCard from '../components/QuestionCard';
 import PolishResultComponent from '../components/PolishResult';
 
@@ -16,12 +15,33 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterLevel, setFilterLevel] = useState<string>('all');
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const filteredQuestions = mockQuestions.filter((q) => {
-    const matchesSearch = q.topic.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesLevel = filterLevel === 'all' || q.level === filterLevel;
-    return matchesSearch && matchesLevel;
-  });
+  // 防抖搜索
+  const debouncedSearch = useCallback(
+    (query: string, level: string) => {
+      const handler = setTimeout(async () => {
+        setIsSearching(true);
+        try {
+          const results = await searchQuestions(query, level);
+          setQuestions(results);
+        } catch (error) {
+          console.error('搜索失败:', error);
+        } finally {
+          setIsSearching(false);
+        }
+      }, 500);
+
+      return () => clearTimeout(handler);
+    },
+    []
+  );
+
+  // 初始化和搜索时加载题目
+  useEffect(() => {
+    debouncedSearch(searchQuery, filterLevel);
+  }, [searchQuery, filterLevel, debouncedSearch]);
 
   const handleSelectQuestion = (question: Question) => {
     setSelectedQuestion(question);
@@ -37,6 +57,8 @@ export default function Home() {
       const result = await polishEssay(essay, selectedQuestion.topic);
       setPolishResult(result);
       setViewMode('result');
+    } catch (error) {
+      console.error('润色失败:', error);
     } finally {
       setIsLoading(false);
     }
@@ -58,6 +80,18 @@ export default function Home() {
   const goToWriting = () => {
     setViewMode('writing');
     setPolishResult(null);
+  };
+
+  const handleManualSearch = async () => {
+    setIsSearching(true);
+    try {
+      const results = await searchQuestions(searchQuery, filterLevel);
+      setQuestions(results);
+    } catch (error) {
+      console.error('搜索失败:', error);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   return (
@@ -91,7 +125,7 @@ export default function Home() {
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-800 mb-2">选择作文题目</h2>
-              <p className="text-gray-600">从以下真题中选择一个题目进行练习</p>
+              <p className="text-gray-600">AI智能搜索真题，助你高效练习</p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -99,11 +133,19 @@ export default function Home() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="搜索题目..."
+                  placeholder="搜索题目（如：读书、AI、环保等）..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-12 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Filter className="w-5 h-5 text-gray-400" />
@@ -117,26 +159,50 @@ export default function Home() {
                   <option value="CET6">六级</option>
                 </select>
               </div>
+              <button
+                onClick={handleManualSearch}
+                disabled={isSearching}
+                className="px-4 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {isSearching ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-5 h-5" />
+                )}
+                搜索
+              </button>
             </div>
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredQuestions.map((question) => (
-                <QuestionCard
-                  key={question.id}
-                  question={question}
-                  isSelected={selectedQuestion?.id === question.id}
-                  onSelect={() => handleSelectQuestion(question)}
-                />
-              ))}
-            </div>
-
-            {filteredQuestions.length === 0 && (
+            {isSearching ? (
               <div className="text-center py-12">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-8 h-8 text-gray-400" />
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
                 </div>
-                <p className="text-gray-500">没有找到匹配的题目</p>
+                <p className="text-gray-500">AI正在搜索题目...</p>
               </div>
+            ) : (
+              <>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {questions.map((question) => (
+                    <QuestionCard
+                      key={question.id}
+                      question={question}
+                      isSelected={selectedQuestion?.id === question.id}
+                      onSelect={() => handleSelectQuestion(question)}
+                    />
+                  ))}
+                </div>
+
+                {questions.length === 0 && !isSearching && (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Search className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <p className="text-gray-500 mb-2">没有找到匹配的题目</p>
+                    <p className="text-gray-400 text-sm">试试其他关键词或配置API密钥</p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -153,9 +219,17 @@ export default function Home() {
                   {selectedQuestion.level === 'CET4' ? '四级' : '六级'}
                 </div>
                 <span className="text-gray-500">{selectedQuestion.year}年真题</span>
+                {selectedQuestion.source && (
+                  <span className="text-xs text-gray-400">{selectedQuestion.source}</span>
+                )}
               </div>
               <h2 className="text-xl font-bold text-gray-800 mb-2">{selectedQuestion.topic}</h2>
-              <p className="text-gray-600">请根据题目要求写一篇120-180词的英语短文</p>
+              {selectedQuestion.description && (
+                <p className="text-gray-600 mb-2">{selectedQuestion.description}</p>
+              )}
+              {selectedQuestion.requirements && (
+                <p className="text-sm text-gray-500">要求: {selectedQuestion.requirements}</p>
+              )}
             </div>
 
             {viewMode === 'writing' && (
@@ -221,6 +295,7 @@ export default function Home() {
       <footer className="bg-white/80 backdrop-blur-sm border-t mt-12">
         <div className="max-w-6xl mx-auto px-4 py-6 text-center text-gray-500 text-sm">
           <p>四六级英语写作助手 · 提升你的英语写作能力</p>
+          <p className="text-xs text-gray-400 mt-1">需要配置阿里云百炼API密钥以获得完整功能</p>
         </div>
       </footer>
     </div>

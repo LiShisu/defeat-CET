@@ -54,10 +54,24 @@ export default function QuestionCard({ question, isSelected, onSelect }: Questio
         {question.topic}
       </h3>
       
-      <p className="text-sm text-gray-500 flex items-center gap-1">
-        <FileText className="w-4 h-4" />
-        根据题目要求写一篇120-180词的英语短文
-      </p>
+      {question.description && (
+        <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+          {question.description}
+        </p>
+      )}
+      
+      {question.requirements && (
+        <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+          <FileText className="w-3 h-3" />
+          {question.requirements}
+        </p>
+      )}
+      
+      {question.source && (
+        <p className="text-xs text-gray-400">
+          来源: {question.source}
+        </p>
+      )}
     </div>
   );
 }

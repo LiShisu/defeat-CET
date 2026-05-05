@@ -2,7 +2,6 @@ import { Check, ArrowRight, Lightbulb, RotateCcw } from 'lucide-react';
 import { PolishResult as PolishResultType } from '../types';
 import WordModal from './WordModal';
 import { useState } from 'react';
-import { getWordDetails } from '../services/aiService';
 
 interface PolishResultProps {
   result: PolishResultType;
@@ -18,9 +17,14 @@ export default function PolishResult({ result, onReset }: PolishResultProps) {
   } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleWordClick = async (word: string) => {
-    const details = await getWordDetails(word);
-    setSelectedWord(details);
+  const handleWordClick = (suggestion: { original: string; suggestion: string; meaning: string; examples: string[] }, isOriginal: boolean) => {
+    const word = isOriginal ? suggestion.original : suggestion.suggestion;
+    setSelectedWord({
+      word,
+      meaning: suggestion.meaning,
+      phonetic: '',
+      examples: suggestion.examples,
+    });
     setIsModalOpen(true);
   };
 
@@ -64,7 +68,7 @@ export default function PolishResult({ result, onReset }: PolishResultProps) {
                 <div key={suggestion.id} className="flex items-center gap-2">
                   <span
                     className="text-red-500 line-through cursor-pointer hover:bg-red-50 px-1 rounded transition-colors"
-                    onClick={() => handleWordClick(suggestion.original)}
+                    onClick={() => handleWordClick(suggestion, true)}
                     title="点击查看详情"
                   >
                     {suggestion.original}
@@ -72,7 +76,7 @@ export default function PolishResult({ result, onReset }: PolishResultProps) {
                   <ArrowRight className="w-4 h-4 text-gray-400" />
                   <span
                     className="text-green-600 font-medium cursor-pointer hover:bg-green-50 px-1 rounded transition-colors"
-                    onClick={() => handleWordClick(suggestion.suggestion)}
+                    onClick={() => handleWordClick(suggestion, false)}
                     title="点击查看详情"
                   >
                     {suggestion.suggestion}

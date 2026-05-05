@@ -4,10 +4,12 @@ export interface Question {
   level: 'CET4' | 'CET6';
   topic: string;
   type: 'argumentation' | 'application' | 'description';
+  description?: string;
+  requirements?: string;
+  source?: string;
 }
 
 export interface WordSuggestion {
-  id: string;
   original: string;
   suggestion: string;
   meaning: string;
@@ -16,7 +18,6 @@ export interface WordSuggestion {
 }
 
 export interface SentenceSuggestion {
-  id: string;
   original: string;
   suggestion: string;
   explanation: string;
